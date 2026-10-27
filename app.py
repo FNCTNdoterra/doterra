@@ -1,6 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 from PyPDF2 import PdfReader
 
 # --- 1. Oldal beállításai ---
@@ -20,47 +19,43 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🌿 doTERRA Csapat Tudástár & AI Kereső")
-st.write("Kérdezz bármit a feltöltött tananyagokból, termékismertetőkből vagy üzleti útmutatókból!")
+st.write("Töltsd fel a doTERRA PDF tananyagokat a bal oldali sávban, és kérdezz tőlük bármit!")
 
 # --- 2. API Kulcs Kezelése ---
-# Az API kulcsot a Streamlit Secrets-ből vagy a sidebar-ból kérjük be
 api_key = st.sidebar.text_input("Google Gemini API Kulcs", type="password")
 
 if not api_key:
-    st.info("👋 Kérlek, add meg a Gemini API kulcsodat az oldalsávban a folytatáshoz! (Ez teljesen ingyenes)")
+    st.info("👋 Kérlek, add meg a Gemini API kulcsodat az oldalsávban a folytatáshoz!")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-# --- 3. Dokumentumok betöltése és feldolgozása ---
-@st.cache_data
-def load_docs():
-    """Beolvassa a 'docs' mappában lévő összes PDF fájlt."""
-    text_content = ""
-    docs_folder = "docs"
-    
-    if not os.path.exists(docs_folder):
-        os.makedirs(docs_folder)
-        
-    pdf_files = [f for f in os.listdir(docs_folder) if f.endswith('.pdf')]
-    
-    if not pdf_files:
-        return None, 0
-        
-    for pdf_file in pdf_files:
-        reader = PdfReader(os.path.join(docs_folder, pdf_file))
-        for page in reader.pages:
-            text = page.extract_text()
-            if text:
-                text_content += f"\n--- Forrás: {pdf_file} ---\n" + text
-                
-    return text_content, len(pdf_files)
-
-# Fájlok beolvasása
-context_text, file_count = load_docs()
-
+# --- 3. Fájlfeltöltő a webes felületen ---
 st.sidebar.markdown("---")
-st.sidebar.write(f"📁 **Betöltött tananyagok:** {file_count} db PDF")
+st.sidebar.subheader("📁 Tananyagok feltöltése")
+
+uploaded_files = st.sidebar.file_uploader(
+    "Válassz ki vagy húzz ide doTERRA PDF fájlokat", 
+    type=["pdf"], 
+    accept_multiple_files=True
+)
+
+context_text = ""
+file_count = 0
+
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        try:
+            reader = PdfReader(uploaded_file)
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    context_text += f"\n--- Forrás: {uploaded_file.name} ---\n" + text
+            file_count += 1
+        except Exception as e:
+            st.sidebar.error(f"Hiba a(z) {uploaded_file.name} olvasásakor: {e}")
+
+st.sidebar.write(f"📊 **Aktív tananyagok:** {file_count} db PDF")
 
 # --- 4. Chat / Kereső felület ---
 if "messages" not in st.session_state:
@@ -73,27 +68,25 @@ for message in st.session_state.messages:
 
 # Kérdés bevitele
 if user_prompt := st.chat_input("Pl.: Melyik olaj jó alvásproblémákra?"):
-    # Felhasználó kérdésének megjelenítése
     st.session_state.messages.append({"role": "user", "content": user_prompt})
     with st.chat_message("user"):
         st.markdown(user_prompt)
 
-    # Ha nincsenek feltöltött dokumentumok
-    if not context_text:
+    # Ha nincsenek feltöltve dokumentumok a weboldalon
+    if not uploaded_files or not context_text:
         with st.chat_message("assistant"):
-            st.error("Még nincsenek feltöltve PDF fájlok a 'docs' mappába! Kérlek, tölts fel anyagokat a projekthez.")
+            st.warning("⚠️ Még nem töltöttél fel PDF fájlt az oldalsávban! Kérlek, húzz be vagy tölts fel legalább egy doTERRA anyagot a bal oldalon.")
         st.stop()
 
     # AI válasz generálása
     with st.chat_message("assistant"):
         with st.spinner("Keresés a tananyagban..."):
             try:
-                # Szigorú Prompt a tananyag használatára
                 system_instruction = f"""
                 Egy segítőkész doTERRA szakértő asszisztens vagy. 
                 A feladatod, hogy kizárólag az alábbi TANANYAG alapján válaszolj a felhasználó kérdésére.
-                Ha a válasz nincs benne a tananyagban, udvariasan mondd el, hogy a meglévő doTERRA fájlok között nem található erre információ.
-                Mindig hivatkozz rá, hogy melyik fájlból származik az információ, ha lehetséges!
+                Ha a válasz nincs benne a tananyagban, udvariasan mondd el, hogy a feltöltött fájlok között nem található erre információ.
+                Mindig hivatkozz rá, hogy melyik fájlból származik az információ!
                 
                 TANANYAG:
                 {context_text}
