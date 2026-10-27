@@ -112,7 +112,7 @@ if user_prompt := st.chat_input("Pl.: Melyik olaj jó alvásproblémákra?"):
                 {context_text}
                 """
                 
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                model = genai.GenerativeModel("gemini-2.5-flash")
                 contents = [system_instruction, "Kérdés: " + user_prompt]
                 for img in image_list:
                     contents.append(img)
