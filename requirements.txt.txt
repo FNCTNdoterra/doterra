@@ -1,4 +1,0 @@
-Plaintext
-streamlit
-google-generativeai
-PyPDF2
