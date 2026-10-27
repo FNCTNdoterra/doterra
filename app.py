@@ -50,34 +50,33 @@ if uploaded_files:
     for uploaded_file in uploaded_files:
         try:
             file_extension = uploaded_file.name.split('.')[-1].lower()
+            file_text = ""
             
             # PDF olvasás
             if file_extension == 'pdf':
                 reader = PdfReader(uploaded_file)
-                file_text = ""
                 for page in reader.pages:
                     text = page.extract_text()
                     if text:
                         file_text += text + "\n"
-                if file_text:
+                if file_text.strip():
                     context_text += f"\n--- Forrás (PDF): {uploaded_file.name} ---\n" + file_text
                     file_count += 1
                         
             # Word (.docx) olvasás
             elif file_extension == 'docx':
                 doc = Document(uploaded_file)
-                file_text = ""
                 for paragraph in doc.paragraphs:
                     if paragraph.text:
                         file_text += paragraph.text + "\n"
-                if file_text:
+                if file_text.strip():
                     context_text += f"\n--- Forrás (Word): {uploaded_file.name} ---\n" + file_text
                     file_count += 1
                         
             # Sima szöveg (.txt) olvasás
             elif file_extension == 'txt':
                 file_text = uploaded_file.getvalue().decode("utf-8")
-                if file_text:
+                if file_text.strip():
                     context_text += f"\n--- Forrás (TXT): {uploaded_file.name} ---\n" + file_text
                     file_count += 1
 
